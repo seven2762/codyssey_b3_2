@@ -42,28 +42,6 @@ $env:AI_API_KEY = "YOUR_KEY"
 
 `OPENAI_API_KEY`도 지원하며, 둘 다 있으면 `AI_API_KEY`를 우선합니다. CLI는 키를 환경변수에서만 읽습니다. `.env` 파일은 자동 로드하지 않으며 키를 소스나 Git에 저장하지 마세요. 사용하는 제공업체의 API 권한과 잔액이 필요합니다.
 
-### 코디세이 게이트웨이와 기존 텀프로젝트 설정 사용
-
-텀프로젝트의 키는 `https://copa.codyssey.kr/v1` 게이트웨이에서 사용합니다. OpenAI 직접 호출 주소에 이 키를 보내지 마세요. 기존 `.env`에 `AI_API_KEY`, `AI_BASE_URL`, `AI_MODEL`이 있으면 실행 도우미가 **AI 설정만 현재 프로세스의 환경변수로 전달**합니다. 설정 파일과 키를 복사하거나 출력하지 않고, 셸 명령을 실행하지도 않습니다.
-
-```bash
-# 분석할 Git 프로젝트 루트에서 실행
-python /path/to/codyssey_b3_2/scripts/run_with_env.py /path/to/Codyssey-TermProject/backend/.env all --preview
-python /path/to/codyssey_b3_2/scripts/run_with_env.py /path/to/Codyssey-TermProject/backend/.env all
-```
-
-이 도우미는 `AI_BASE_URL`도 필수로 확인하며 기본 요청 형식을 `compatible`로 설정합니다. 직접 환경변수를 설정할 수도 있습니다.
-
-```bash
-export AI_BASE_URL="https://copa.codyssey.kr/v1"
-export AI_MODEL="gpt-5.4-mini"
-export AI_API_FORMAT="compatible"
-# AI_API_KEY는 별도로 환경변수에 설정
-python main.py all
-```
-
-`compatible` 형식은 `max_tokens`를 보내고 `response_format`, `store`를 보내지 않습니다. 코디세이 게이트웨이가 고급 옵션을 포함한 요청에 `unsupported_feature` 오류를 반환해 기본 형식으로 호환성을 확인했습니다. JSON 형식은 프롬프트로 요청한 뒤 로컬에서 검증합니다.
-
 ## 3. 명령과 옵션
 
 ```bash
