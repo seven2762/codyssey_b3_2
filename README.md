@@ -9,8 +9,8 @@ Git 변경 사항을 읽고 AI API를 한 번 호출해 변경 요약, 커밋 �
 - macOS / Linux / Windows의 터미널 사용
 
 ```bash
-git clone -b feature/commit-pr-generator https://github.com/seven2762/codyssey_b3_2.git
-cd codyssey_b3_2
+git clone -b feature/commit-pr-generator YOUR_REPOSITORY_URL ai-git-draft
+cd ai-git-draft
 python3 -m venv .venv
 source .venv/bin/activate
 python --version
@@ -23,7 +23,7 @@ Windows PowerShell에서는 `python -m venv .venv`, `.\.venv\Scripts\Activate.ps
 
 ```bash
 cd /path/to/your-project
-python /path/to/codyssey_b3_2/main.py commit
+python /path/to/ai-git-draft/main.py commit
 ```
 
 ## 2. API Key 환경변수
@@ -170,16 +170,15 @@ fix: 빈 입력 검증 추가
 
 ## 8. 실제 실행 검증 과정
 
-2026-10-13에 Python 3.14.7 환경에서 **실제 코디세이 API를 호출**해 검증했습니다. 현재 프로젝트의 소스 대신 임시 Git 저장소에 직접 만든 `greeting.py` 샘플을 사용했습니다. 아래 성공 결과는 모의 응답이나 설명용 예시가 아니라 실제 실행에서 받은 결과입니다.
+2026-10-13에 Python 3.14.7 환경에서 **실제 AI API를 호출**해 검증했습니다. 현재 프로젝트의 소스 대신 임시 Git 저장소에 직접 만든 `greeting.py` 샘플을 사용했습니다. 아래 성공 결과는 모의 응답이나 설명용 예시가 아니라 실제 실행에서 받은 결과입니다.
 
 ### 1) API 설정 확인
 
-코디세이 텀프로젝트의 `backend/.env`에서 다음 설정을 확인했습니다. 키 값은 출력하거나 이 저장소에 복사하지 않았습니다.
+실행에 사용할 AI 설정 파일에서 다음 항목을 확인하고 환경변수로 전달했습니다. 키 값은 출력하거나 이 저장소에 복사하지 않았습니다.
 
 | 항목 | 검증에 사용한 설정 |
 | --- | --- |
 | API Key | 기존 `AI_API_KEY`를 실행 프로세스의 환경변수로 전달 |
-| API 주소 | `https://copa.codyssey.kr/v1` |
 | 모델 | `gpt-5.4-mini` |
 | 요청 형식 | `compatible` |
 | temperature / max_tokens | `0.2` / `1200` |
@@ -201,11 +200,11 @@ fix: 빈 입력 검증 추가
 
 ### 3) CLI 실행
 
-아래는 같은 검증을 재현하는 명령입니다. 도구 저장소 루트에서 시작하고, `term_env`는 기존 텀프로젝트 설정 파일의 실제 경로로 바꾸세요.
+아래는 같은 검증을 재현하는 명령입니다. 도구 저장소 루트에서 시작하고, `ai_env`는 사용할 AI 설정 파일의 실제 경로로 바꾸세요. 설정 파일에는 `AI_API_KEY`, `AI_BASE_URL`, `AI_MODEL`이 필요합니다.
 
 ```bash
 tool_root="$(pwd)"
-term_env="/path/to/Codyssey-TermProject/backend/.env"
+ai_env="/path/to/ai/.env"
 demo_dir="$(mktemp -d)"
 cd "$demo_dir"
 
@@ -226,7 +225,7 @@ def greet(name):
     return f"Hello, {name}"
 PYTHON
 
-"$tool_root/.venv/bin/python" "$tool_root/scripts/run_with_env.py" "$term_env" all \
+"$tool_root/.venv/bin/python" "$tool_root/scripts/run_with_env.py" "$ai_env" all \
   --context "공개용으로 직접 만든 샘플 코드입니다. 빈 이름을 거부하도록 입력 검증을 추가했습니다. 실제 테스트는 아직 실행하지 않았습니다."
 ```
 
