@@ -28,4 +28,3 @@ def load_ai_env(path: Path) -> None:
     os.environ.pop("AI_API_KEY", None)
     os.environ.pop("OPENAI_API_KEY", None)
     os.environ.update(settings)
-
