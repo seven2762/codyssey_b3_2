@@ -190,18 +190,121 @@ fix: 빈 입력 검증 추가
 
 `commit`, `pr`, `all` 모두 **실행당 최대 1회** API 요청을 하고 자동 재시도하지 않습니다. API 호출을 시도한 횟수를 마지막 로그에 출력합니다. 실패한 요청도 1회로 집계합니다. 입력 미리보기, 변경 없음, 키 누락은 0회입니다. `all`을 사용하면 커밋·PR을 따로 실행할 때보다 요청 수를 줄일 수 있습니다. `openai` 형식은 `store: false`로 요청하지만 이 옵션만으로 모든 데이터 보관을 차단하지는 않습니다. `compatible` 형식은 `store` 옵션을 보내지 않으므로 게이트웨이의 보관 정책을 따릅니다.
 
-## 8. 실행 및 제출 확인
+## 8. 실제 실행 검증 과정
 
-직접 만든 공개용 `greeting.py` 샘플의 Git diff를 코디세이 게이트웨이(`gpt-5.4-mini`, `compatible`)로 보내, 호출 1회로 변경 요약·커밋·PR 제목 및 세 섹션 생성이 완료되는 것을 확인했습니다. 이 검증에는 현재 프로젝트의 소스 diff를 사용하지 않았습니다.
+2026-10-13에 Python 3.14.7 환경에서 **실제 코디세이 API를 호출**해 검증했습니다. 현재 프로젝트의 소스 대신 임시 Git 저장소에 직접 만든 `greeting.py` 샘플을 사용했습니다. 아래 성공 결과는 모의 응답이나 설명용 예시가 아니라 실제 실행에서 받은 결과입니다.
 
-실제 연동 확인은 키 설정 후 분석할 프로젝트에 변경을 만들고 수행합니다.
+### 1) API 설정 확인
 
-```bash
-python main.py all --preview
-python main.py all --context "이번 변경 이유와 요구사항"
+코디세이 텀프로젝트의 `backend/.env`에서 다음 설정을 확인했습니다. 키 값은 출력하거나 이 저장소에 복사하지 않았습니다.
+
+| 항목 | 검증에 사용한 설정 |
+| --- | --- |
+| API Key | 기존 `AI_API_KEY`를 실행 프로세스의 환경변수로 전달 |
+| API 주소 | `https://copa.codyssey.kr/v1` |
+| 모델 | `gpt-5.4-mini` |
+| 요청 형식 | `compatible` |
+| temperature / max_tokens | `0.2` / `1200` |
+
+처음에는 고급 옵션을 포함한 요청에서 HTTP 400, `unsupported_feature` 오류를 받았습니다. `response_format`과 `store`를 제외하고 `max_tokens`를 사용하는 기본 호환 형식으로 바꾼 뒤 응답을 정상 수신했습니다. 오류 확인과 수정 후 검증은 각각 별도 실행이었으며 자동 재시도는 하지 않았습니다.
+
+### 2) 검증할 Git 변경 준비
+
+기존 인사 함수에 빈 이름을 거부하는 조건을 추가했습니다.
+
+```diff
+ def greet(name):
++    if not name.strip():
++        raise ValueError("name is required")
+     return f"Hello, {name}"
 ```
 
-출력에서 호출 횟수 1회, 변경 요약, 커밋 제목, PR 제목, 세 섹션 및 불릿을 확인하세요. 이 프로젝트를 커밋한 직후에는 변경이 없어 API 호출이 생략됩니다.
+`git status`로 변경 파일 1개를 감지하고 `git diff`로 10줄의 변경 정보를 수집했습니다. 샘플 함수 자체의 동작 테스트는 실행하지 않았으며, API 입력에도 그 사실을 명시했습니다.
+
+### 3) CLI 실행
+
+아래는 같은 검증을 재현하는 명령입니다. 도구 저장소 루트에서 시작하고, `term_env`는 기존 텀프로젝트 설정 파일의 실제 경로로 바꾸세요.
+
+```bash
+tool_root="$(pwd)"
+term_env="/path/to/Codyssey-TermProject/backend/.env"
+demo_dir="$(mktemp -d)"
+cd "$demo_dir"
+
+git init -q
+git config user.name "Demo"
+git config user.email "demo@example.invalid"
+cat > greeting.py <<'PYTHON'
+def greet(name):
+    return f"Hello, {name}"
+PYTHON
+git add greeting.py
+git commit -qm "initial demo"
+
+cat > greeting.py <<'PYTHON'
+def greet(name):
+    if not name.strip():
+        raise ValueError("name is required")
+    return f"Hello, {name}"
+PYTHON
+
+"$tool_root/.venv/bin/python" "$tool_root/scripts/run_with_env.py" "$term_env" all \
+  --context "공개용으로 직접 만든 샘플 코드입니다. 빈 이름을 거부하도록 입력 검증을 추가했습니다. 실제 테스트는 아직 실행하지 않았습니다."
+```
+
+### 4) 실제 출력 확인
+
+성공한 실행의 주요 출력입니다. 변경 요약과 일부 PR 불릿은 아래 기록에서 생략했습니다.
+
+```text
+[INFO] Git status 수집 완료: 1개 파일 변경 감지
+[INFO] 현재 브랜치: main
+[INFO] Git diff 수집 완료: 10줄
+--- Changed Files ---
+ M greeting.py
+[INFO] AI API 요청 중...
+[DONE] 초안 생성 및 형식 검증 완료
+
+--- Commit Message ---
+fix: greet 입력 검증 추가
+
+- greet(name)에서 name.strip() 결과가 비어 있으면 ValueError("name is required")를 발생시키도록 추가
+- 기존 반환 문자열 "Hello, {name}" 로직은 유지
+
+--- PR Title ---
+fix: greet 입력 검증 추가
+
+--- PR Body ---
+## Why
+- 빈 이름 또는 공백만 있는 입력을 거부해 입력 검증을 강화하기 위함
+
+## What
+- greet(name)에서 name.strip() 결과가 비어 있으면 ValueError("name is required")를 발생시키도록 추가
+- 기존 반환 문자열 "Hello, {name}" 로직은 유지
+
+## How to Test
+- 권장 절차: greeting.py에서 greet("Alice") 호출 시 "Hello, Alice"가 반환되는지 확인
+- 권장 절차: greet("") 또는 greet(" ") 호출 시 ValueError("name is required")가 발생하는지 확인
+
+----------------------
+[INFO] 초안입니다. 검토 후 직접 적용하세요.
+[INFO] AI API 호출 횟수: 1
+```
+
+제목이 한 줄로 출력되고 길이 제한을 만족하는지, PR의 Why / What / How to Test에 각각 불릿이 있는지 확인했습니다. 하나의 `all` 실행에서 변경 요약·커밋·PR을 함께 생성했고 API 호출 횟수는 **1회**, 종료 코드는 **0**이었습니다.
+
+### 5) 변경 없는 상태 확인
+
+커밋 후 작업 디렉토리가 깨끗한 상태에서 `python main.py all`을 실행해 API를 호출하지 않고 종료하는 것도 확인했습니다.
+
+```text
+[INFO] 변경 사항이 없습니다. 생성하지 않고 종료합니다.
+[INFO] AI API 호출 횟수: 0
+```
+
+실제 프로젝트에서는 변경을 만든 뒤 `--preview`로 전송 내용을 검토하고 실행하세요. 위 검증은 API 연동과 초안 생성 흐름을 확인한 것으로, 다른 변경에 대한 의미적 정확성까지 보장하지는 않습니다.
+
+## 9. GitHub 제출
 
 GitHub 업로드는 개발자가 별도로 수행합니다. 다음 명령은 CLI 기능에 포함되지 않습니다.
 
