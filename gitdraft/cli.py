@@ -101,19 +101,18 @@ def show(data: dict, command: str) -> None:
     print("----------------------\n[INFO] 초안입니다. 검토 후 직접 적용하세요.")
 
 
-def main(argv=None, *, load_local_env=True) -> int:
-    if load_local_env:
-        try:
-            env_path = Path.cwd() / ".env"
-            if env_path.exists():
-                load_ai_env(env_path)
-        except OSError:
-            print("[ERROR] 현재 작업 폴더의 .env 파일을 읽을 수 없습니다.", file=sys.stderr)
-            return 1
-        except ValueError as exc:
-            print("[ERROR] " + str(exc), file=sys.stderr)
-            return 1
-    args = parser().parse_args(argv)
+def main() -> int:
+    try:
+        env_path = Path.cwd() / ".env"
+        if env_path.exists():
+            load_ai_env(env_path)
+    except OSError:
+        print("[ERROR] 현재 작업 폴더의 .env 파일을 읽을 수 없습니다.", file=sys.stderr)
+        return 1
+    except ValueError as exc:
+        print("[ERROR] " + str(exc), file=sys.stderr)
+        return 1
+    args = parser().parse_args()
     calls = 0
     try:
         context = collect(args.safe_mode, args.max_files, args.max_lines)

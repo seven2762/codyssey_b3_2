@@ -211,15 +211,16 @@ fix: 빈 입력 검증 추가
 
 ### 3) CLI 실행
 
-아래는 같은 검증을 재현하는 명령입니다. 도구 저장소 루트에서 시작하고, `ai_env`는 사용할 AI 설정 파일의 실제 경로로 바꾸세요. 설정 파일에는 `AI_API_KEY`, `AI_BASE_URL`, `AI_MODEL`이 필요합니다.
+아래는 같은 검증을 재현하는 명령입니다. 도구 저장소 루트의 `.env`에 `AI_API_KEY`, `AI_BASE_URL`, `AI_MODEL`을 설정한 뒤 시작하세요. 임시 저장소에도 같은 설정을 복사하고 Git 수집 대상에서 제외합니다.
 
 ```bash
 tool_root="$(pwd)"
-ai_env="/path/to/ai/.env"
 demo_dir="$(mktemp -d)"
 cd "$demo_dir"
 
 git init -q
+cp "$tool_root/.env" .env
+printf '\n.env\n' >> .git/info/exclude
 git config user.name "Demo"
 git config user.email "demo@example.invalid"
 cat > greeting.py <<'PYTHON'
@@ -236,7 +237,7 @@ def greet(name):
     return f"Hello, {name}"
 PYTHON
 
-"$tool_root/.venv/bin/python" "$tool_root/scripts/run_with_env.py" "$ai_env" all \
+"$tool_root/.venv/bin/python" "$tool_root/main.py" all \
   --context "공개용으로 직접 만든 샘플 코드입니다. 빈 이름을 거부하도록 입력 검증을 추가했습니다. 실제 테스트는 아직 실행하지 않았습니다."
 ```
 
@@ -298,7 +299,7 @@ GitHub 업로드는 개발자가 별도로 수행합니다. 다음 명령은 CLI
 
 ```bash
 git switch -c feature/my-change
-git add main.py gitdraft scripts README.md pyproject.toml .gitignore
+git add main.py gitdraft README.md pyproject.toml .gitignore
 git commit -m "feat: add AI Git commit and PR draft CLI"
 git push -u origin feature/my-change
 ```
@@ -312,7 +313,6 @@ gitdraft/
   git_context.py         Git 수집·민감정보 처리
   ai.py                  프롬프트·REST 요청·응답·오류 처리
   env.py                 현재 작업 폴더의 .env 설정 로드
-scripts/run_with_env.py   기존 .env의 AI 설정을 환경변수로 전달
 pyproject.toml           Python 3.10+ 및 의존성 정보
 .gitignore               환경·키·캐시 제외
 README.md                사용 및 운영 가이드
