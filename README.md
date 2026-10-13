@@ -40,7 +40,18 @@ Windows PowerShell:
 $env:AI_API_KEY = "YOUR_KEY"
 ```
 
-`OPENAI_API_KEY`도 지원하며, 둘 다 있으면 `AI_API_KEY`를 우선합니다. CLI는 키를 환경변수에서만 읽습니다. `.env` 파일은 자동 로드하지 않으며 키를 소스나 Git에 저장하지 마세요. 사용하는 제공업체의 API 권한과 잔액이 필요합니다.
+`OPENAI_API_KEY`도 지원하며, 둘 다 있으면 `AI_API_KEY`를 우선합니다. CLI는 현재 작업 폴더의 `.env`가 있으면 AI 설정만 읽어 실행 프로세스의 환경변수로 전달합니다. `.env` 설정을 우선 적용하고, 명령행 옵션은 그 설정보다 우선합니다. `.env`가 없으면 기존 환경변수를 사용합니다. 키를 소스나 Git에 저장하지 마세요. 사용하는 제공업체의 API 권한과 잔액이 필요합니다.
+
+현재 작업 폴더의 `.env`에는 다음처럼 설정합니다. 주소와 모델은 사용하는 제공업체에 맞게 지정하세요. 파일은 Git에서 제외됩니다.
+
+```dotenv
+AI_API_KEY="YOUR_KEY"
+AI_BASE_URL="https://api.openai.com/v1"
+AI_MODEL="gpt-4o-mini"
+AI_API_FORMAT="openai"
+```
+
+설정 후에는 별도의 경로 지정 없이 `python main.py commit`, `python main.py pr`, `python main.py all`로 실행합니다. 기존 설정 파일에 `AI_API_FORMAT`이 없으면 `compatible` 형식을 사용합니다.
 
 ## 3. 명령과 옵션
 
@@ -300,6 +311,7 @@ gitdraft/
   cli.py                 옵션·후처리·출력
   git_context.py         Git 수집·민감정보 처리
   ai.py                  프롬프트·REST 요청·응답·오류 처리
+  env.py                 현재 작업 폴더의 .env 설정 로드
 scripts/run_with_env.py   기존 .env의 AI 설정을 환경변수로 전달
 pyproject.toml           Python 3.10+ 및 의존성 정보
 .gitignore               환경·키·캐시 제외
