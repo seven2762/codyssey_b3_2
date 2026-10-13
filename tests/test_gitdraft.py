@@ -13,6 +13,7 @@ import urllib.error
 from gitdraft.ai import generate
 from gitdraft.cli import main, normalize, parser, redact_result
 from gitdraft.git_context import collect, mask, DraftError
+from scripts.run_with_env import load_ai_env
 
 DRAFT = {"summary": "입력 검증을 개선했습니다.", "title": "fix: 입력 검증 개선",
          "what": ["app.py의 빈 입력 처리를 추가했습니다."],
@@ -164,6 +165,47 @@ class RepoTests(unittest.TestCase):
 
 
 class OutputAndAPITests(unittest.TestCase):
+    def test_gateway_request_format(self):
+        with patch("gitdraft.ai.urllib.request.build_opener") as opener:
+            opener.return_value.open.return_value = response()
+            generate({}, "all", "", "test-key", "gpt-5.4-mini", 0.2, 1200,
+                     "https://copa.codyssey.kr/v1/", "compatible")
+            request = opener.return_value.open.call_args.args[0]
+        self.assertEqual(request.full_url, "https://copa.codyssey.kr/v1/chat/completions")
+        body = json.loads(request.data)
+        self.assertEqual(body["max_tokens"], 1200)
+        for name in ("response_format", "store", "max_completion_tokens"):
+            self.assertNotIn(name, body)
+
+    def test_unsafe_endpoint_rejected(self):
+        for url in ("http://example.com/v1", "https://user:password@example.com/v1", "https://example.com/?key=x"):
+            with patch("gitdraft.ai.urllib.request.build_opener") as opener:
+                with self.assertRaises(DraftError):
+                    generate({}, "all", "", "key", "model", 0.2, 100, url)
+                opener.assert_not_called()
+
+    def test_env_loader_only_imports_ai_settings(self):
+        with tempfile.TemporaryDirectory() as tmp, patch.dict(os.environ, {}, clear=True):
+            env = Path(tmp) / ".env"
+            env.write_text('AI_API_KEY="demo-key"\nAI_BASE_URL=https://example.com/v1\nAI_MODEL=demo\nDATABASE_URL=private\n')
+            load_ai_env(env)
+            self.assertEqual(os.environ["AI_API_KEY"], "demo-key")
+            self.assertEqual(os.environ["AI_API_FORMAT"], "compatible")
+            self.assertNotIn("DATABASE_URL", os.environ)
+            self.assertEqual(parser().parse_args(["all"]).model, "demo")
+
+    def test_env_loader_requires_matching_endpoint(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            env = Path(tmp) / ".env"
+            env.write_text('AI_API_KEY="demo-key"\n')
+            with self.assertRaises(ValueError):
+                load_ai_env(env)
+
+    def test_fenced_json_response(self):
+        with patch("gitdraft.ai.urllib.request.build_opener") as opener:
+            opener.return_value.open.return_value = response("```json\n" + json.dumps(DRAFT) + "\n```")
+            self.assertEqual(generate({}, "pr", "", "key", "model", 0.2, 100), DRAFT)
+
     def test_title_limits_and_missing_sections(self):
         data, notices = normalize({"title": "feat: " + "가" * 100 + "\nextra", "summary": "변경"},
                                   {"truncated": False, "omitted_files": 0, "files": [{"path": "app.py"}]})

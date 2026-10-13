@@ -4,7 +4,7 @@ Git 변경 사항을 읽고 AI API를 한 번 호출해 변경 요약, 커밋 �
 
 ## 1. 개발 환경과 설치
 
-- Python **3.10 이상**, Git, 인터넷 연결, OpenAI API Key
+- Python **3.10 이상**, Git, 인터넷 연결, OpenAI 또는 호환 게이트웨이 API Key
 - 웹 화면 및 추가 Python 패키지 없이 표준 라이브러리로 실행
 - macOS / Linux / Windows의 터미널 사용
 
@@ -40,7 +40,29 @@ Windows PowerShell:
 $env:AI_API_KEY = "YOUR_KEY"
 ```
 
-`OPENAI_API_KEY`도 지원하며, 둘 다 있으면 `AI_API_KEY`를 우선합니다. 키는 환경변수에서만 읽습니다. `.env` 파일은 자동 로드하지 않으며 키를 소스나 Git에 저장하지 마세요. 이 프로그램은 OpenAI API의 별도 사용 권한과 잔액이 필요합니다.
+`OPENAI_API_KEY`도 지원하며, 둘 다 있으면 `AI_API_KEY`를 우선합니다. CLI는 키를 환경변수에서만 읽습니다. `.env` 파일은 자동 로드하지 않으며 키를 소스나 Git에 저장하지 마세요. 사용하는 제공업체의 API 권한과 잔액이 필요합니다.
+
+### 코디세이 게이트웨이와 기존 텀프로젝트 설정 사용
+
+텀프로젝트의 키는 `https://copa.codyssey.kr/v1` 게이트웨이에서 사용합니다. OpenAI 직접 호출 주소에 이 키를 보내지 마세요. 기존 `.env`에 `AI_API_KEY`, `AI_BASE_URL`, `AI_MODEL`이 있으면 실행 도우미가 **AI 설정만 현재 프로세스의 환경변수로 전달**합니다. 설정 파일과 키를 복사하거나 출력하지 않고, 셸 명령을 실행하지도 않습니다.
+
+```bash
+# 분석할 Git 프로젝트 루트에서 실행
+python /path/to/codyssey_b3_2/scripts/run_with_env.py /path/to/Codyssey-TermProject/backend/.env all --preview
+python /path/to/codyssey_b3_2/scripts/run_with_env.py /path/to/Codyssey-TermProject/backend/.env all
+```
+
+이 도우미는 `AI_BASE_URL`도 필수로 확인하며 기본 요청 형식을 `compatible`로 설정합니다. 직접 환경변수를 설정할 수도 있습니다.
+
+```bash
+export AI_BASE_URL="https://copa.codyssey.kr/v1"
+export AI_MODEL="gpt-5.4-mini"
+export AI_API_FORMAT="compatible"
+# AI_API_KEY는 별도로 환경변수에 설정
+python main.py all
+```
+
+`compatible` 형식은 `max_tokens`를 보내고 `response_format`, `store`를 보내지 않습니다. 코디세이 게이트웨이가 고급 옵션을 포함한 요청에 `unsupported_feature` 오류를 반환해 기본 형식으로 호환성을 확인했습니다. JSON 형식은 프롬프트로 요청한 뒤 로컬에서 검증합니다.
 
 ## 3. 명령과 옵션
 
@@ -63,7 +85,9 @@ python main.py commit -model gpt-4o-mini -temperature 0.2 -max-tokens 1200 -safe
 
 | 옵션 | 기본값 | 의미 |
 | --- | --- | --- |
-| `--model`, `-model` | `gpt-4o-mini` | 사용할 Chat Completions 모델 |
+| `--model`, `-model` | `AI_MODEL` 또는 `gpt-4o-mini` | 사용할 Chat Completions 모델 |
+| `--base-url` | `AI_BASE_URL` 또는 `https://api.openai.com/v1` | OpenAI 호환 HTTPS 게이트웨이 주소 |
+| `--api-format` | `AI_API_FORMAT` 또는 `openai` | `openai` / `compatible` 요청 형식 |
 | `--temperature`, `-temperature` | `0.2` | 0~2, 낮을수록 표현의 변동이 줄어드는 경향 |
 | `--max-tokens`, `-max-tokens` | `1200` | 양의 정수, 최대 생성 토큰 수 |
 | `--context` | 빈 문자열 | 변경 이유, 요구사항, 실제 실행한 테스트; 최대 4,000자 |
@@ -73,7 +97,7 @@ python main.py commit -model gpt-4o-mini -temperature 0.2 -max-tokens 1200 -safe
 | `--max-lines` | `200` | 전송할 최대 diff 줄 수 |
 | `--preview` | 비활성 | API를 호출하지 않고 전송 컨텍스트 출력 |
 
-CLI의 `max-tokens`는 REST 요청의 `max_completion_tokens`로 전달합니다. 출력 한도가 너무 작으면 JSON이 잘릴 수 있어 완성되지 않은 응답은 오류로 처리합니다. 모든 모델이 `temperature`와 JSON 모드를 지원하는 것은 아닙니다. 모델을 바꾼 뒤 HTTP 400이 발생하면 지원 파라미터를 확인하세요. 파라미터와 응답 형식의 근거는 [OpenAI Chat Completions 공식 문서](https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create)입니다.
+CLI의 `max-tokens`는 `openai` 형식에서 `max_completion_tokens`, `compatible` 형식에서 `max_tokens`로 전달합니다. 출력 한도가 너무 작으면 JSON이 잘릴 수 있어 완성되지 않은 응답은 오류로 처리합니다. 모든 모델이 `temperature`와 JSON 모드를 지원하는 것은 아닙니다. 모델을 바꾼 뒤 HTTP 400이 발생하면 지원 파라미터를 확인하세요. 파라미터와 응답 형식의 근거는 [OpenAI Chat Completions 공식 문서](https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create)입니다.
 
 ## 4. 입력과 자동화 흐름
 
@@ -164,7 +188,7 @@ fix: 빈 입력 검증 추가
 
 패턴 마스킹은 모든 개인정보·회사 기밀을 검출하지 못합니다. 실행 전 `--preview`로 입력을 직접 확인하고, 민감한 변경은 외부 API로 전송하지 마세요. 안전 모드를 해제하면 입력의 민감 파일·문자열이 전송될 수 있습니다. 응답 문자열의 키 마스킹은 항상 적용합니다.
 
-`commit`, `pr`, `all` 모두 **실행당 최대 1회** API 요청을 하고 자동 재시도하지 않습니다. API 호출을 시도한 횟수를 마지막 로그에 출력합니다. 실패한 요청도 1회로 집계합니다. 입력 미리보기, 변경 없음, 키 누락은 0회입니다. `all`을 사용하면 커밋·PR을 따로 실행할 때보다 요청 수를 줄일 수 있습니다. `store: false`로 요청하며, 이 옵션만으로 제공업체의 모든 데이터 보관을 차단하는 것은 아닙니다.
+`commit`, `pr`, `all` 모두 **실행당 최대 1회** API 요청을 하고 자동 재시도하지 않습니다. API 호출을 시도한 횟수를 마지막 로그에 출력합니다. 실패한 요청도 1회로 집계합니다. 입력 미리보기, 변경 없음, 키 누락은 0회입니다. `all`을 사용하면 커밋·PR을 따로 실행할 때보다 요청 수를 줄일 수 있습니다. `openai` 형식은 `store: false`로 요청하지만 이 옵션만으로 모든 데이터 보관을 차단하지는 않습니다. `compatible` 형식은 `store` 옵션을 보내지 않으므로 게이트웨이의 보관 정책을 따릅니다.
 
 ## 8. 테스트 및 제출 확인
 
@@ -173,6 +197,8 @@ python -m unittest discover -s tests -v
 ```
 
 테스트는 실제 임시 Git 저장소와 모의 HTTP 응답을 이용합니다. API Key나 비용 없이 변경 없음, staged/unstaged, 신규·삭제·이름 변경, 파일·줄 제한, 민감정보 제외·마스킹, 옵션, REST 요청 구성, 출력 형식 및 API 오류를 검증합니다. **모의 API 테스트는 실제 AI 응답의 의미적 품질을 보장하지 않습니다.**
+
+2026-10-13 기준 자동 테스트 26개가 통과했습니다. 직접 만든 공개용 `greeting.py` 샘플의 Git diff를 코디세이 게이트웨이(`gpt-5.4-mini`, `compatible`)로 보내, 호출 1회로 변경 요약·커밋·PR 제목 및 세 섹션 생성이 완료되는 것도 확인했습니다. 이 검증에는 현재 프로젝트의 소스 diff를 사용하지 않았습니다.
 
 실제 연동 확인은 키 설정 후 분석할 프로젝트에 변경을 만들고 수행합니다.
 
@@ -187,7 +213,7 @@ GitHub 업로드는 개발자가 별도로 수행합니다. 다음 명령은 CLI
 
 ```bash
 git switch -c feature/my-change
-git add main.py gitdraft tests README.md pyproject.toml .gitignore
+git add main.py gitdraft scripts tests README.md pyproject.toml .gitignore
 git commit -m "feat: add AI Git commit and PR draft CLI"
 git push -u origin feature/my-change
 ```
@@ -200,6 +226,7 @@ gitdraft/
   cli.py                 옵션·후처리·출력
   git_context.py         Git 수집·민감정보 처리
   ai.py                  프롬프트·REST 요청·응답·오류 처리
+scripts/run_with_env.py   기존 .env의 AI 설정을 환경변수로 전달
 tests/test_gitdraft.py    자동 테스트
 pyproject.toml           Python 3.10+ 및 의존성 정보
 .gitignore               환경·키·캐시 제외

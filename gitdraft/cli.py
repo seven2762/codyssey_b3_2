@@ -26,7 +26,12 @@ def temperature(value: str) -> float:
 def parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description="Git 변경 사항으로 검토용 커밋/PR 초안을 생성합니다.")
     p.add_argument("command", choices=("commit", "pr", "all"))
-    p.add_argument("--model", "-model", default="gpt-4o-mini")
+    p.add_argument("--model", "-model", default=os.getenv("AI_MODEL") or "gpt-4o-mini")
+    p.add_argument("--base-url", default=os.getenv("AI_BASE_URL") or "https://api.openai.com/v1",
+                   help="OpenAI 호환 HTTPS 게이트웨이 주소 (AI_BASE_URL 지원)")
+    p.add_argument("--api-format", choices=("openai", "compatible"),
+                   default=os.getenv("AI_API_FORMAT") or "openai",
+                   help="compatible은 고급 JSON 옵션 없이 max_tokens를 사용")
     p.add_argument("--temperature", "-temperature", type=temperature, default=0.2)
     p.add_argument("--max-tokens", "-max-tokens", type=positive, default=1200)
     p.add_argument("--context", default="", help="변경 이유·요구사항·실행한 테스트 정보")
@@ -127,7 +132,7 @@ def main(argv=None) -> int:
         print("[INFO] AI API 요청 중...", flush=True)
         calls = 1
         result = generate(context, args.command, reason, key, args.model,
-                          args.temperature, args.max_tokens)
+                          args.temperature, args.max_tokens, args.base_url, args.api_format)
         result = redact_result(result, key)
         data, notices = normalize(result, context)
         for notice in notices:

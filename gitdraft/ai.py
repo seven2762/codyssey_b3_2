@@ -3,6 +3,7 @@ import json
 import socket
 import urllib.error
 import urllib.request
+from urllib.parse import urlsplit
 from .git_context import DraftError, mask
 
 SYSTEM_PROMPT = """당신은 Git 변경 사항의 커밋 및 PR 초안을 작성하는 개발 도우미다.
@@ -28,7 +29,12 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
 
 
 def generate(context: dict, command: str, reason: str, key: str,
-             model: str, temperature: float, max_tokens: int) -> dict:
+             model: str, temperature: float, max_tokens: int,
+             base_url: str = "https://api.openai.com/v1", api_format: str = "openai") -> dict:
+    endpoint = urlsplit(base_url)
+    if (endpoint.scheme != "https" or not endpoint.hostname or endpoint.username
+            or endpoint.password or endpoint.query or endpoint.fragment):
+        raise DraftError("AI_BASE_URL은 인증정보·쿼리가 없는 HTTPS 주소여야 합니다.")
     payload = {"model": model, "temperature": temperature,
                "max_completion_tokens": max_tokens, "store": False,
                "response_format": {"type": "json_object"},
@@ -36,8 +42,14 @@ def generate(context: dict, command: str, reason: str, key: str,
                             {"role": "user", "content": json.dumps(
                                 {"command": command, "context": reason, **context},
                                 ensure_ascii=False)}]}
+    if api_format == "compatible":
+        payload["max_tokens"] = payload.pop("max_completion_tokens")
+        payload.pop("store")
+        payload.pop("response_format")
+    elif api_format != "openai":
+        raise DraftError("지원하지 않는 API 요청 형식입니다.")
     request = urllib.request.Request(
-        "https://api.openai.com/v1/chat/completions",
+        base_url.rstrip("/") + "/chat/completions",
         data=json.dumps(payload).encode("utf-8"), method="POST",
         headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"})
     try:
@@ -60,7 +72,12 @@ def generate(context: dict, command: str, reason: str, key: str,
         choice = envelope["choices"][0]
         if choice.get("finish_reason") != "stop":
             raise DraftError("API 응답이 완성되지 않았습니다. max-tokens 또는 모델을 확인하세요.")
-        result = json.loads(choice["message"]["content"])
+        content = choice["message"]["content"].strip()
+        if content.startswith("```json\n") and content.endswith("```"):
+            content = content[8:-3].strip()
+        elif content.startswith("```\n") and content.endswith("```"):
+            content = content[4:-3].strip()
+        result = json.loads(content)
         if not isinstance(result, dict):
             raise ValueError("not an object")
         return result
