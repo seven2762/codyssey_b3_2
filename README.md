@@ -77,7 +77,7 @@ python main.py commit
 python main.py pr --context "빈 입력에서 예외가 발생해 입력 검증을 추가했습니다."
 
 # 요약 + 커밋 + PR을 한 번의 API 요청으로 생성
-python main.py all --context "요구사항: 오류 원인 안내. 실행한 테스트: unittest 통과."
+python main.py all --context "요구사항: 오류 원인 안내. 실행한 확인: 오류 메시지 수동 점검 완료."
 
 # 모델, 생성 다양성, 최대 출력 토큰 변경
 python main.py commit -model gpt-4o-mini -temperature 0.2 -max-tokens 1200 -safe-mode
@@ -190,15 +190,9 @@ fix: 빈 입력 검증 추가
 
 `commit`, `pr`, `all` 모두 **실행당 최대 1회** API 요청을 하고 자동 재시도하지 않습니다. API 호출을 시도한 횟수를 마지막 로그에 출력합니다. 실패한 요청도 1회로 집계합니다. 입력 미리보기, 변경 없음, 키 누락은 0회입니다. `all`을 사용하면 커밋·PR을 따로 실행할 때보다 요청 수를 줄일 수 있습니다. `openai` 형식은 `store: false`로 요청하지만 이 옵션만으로 모든 데이터 보관을 차단하지는 않습니다. `compatible` 형식은 `store` 옵션을 보내지 않으므로 게이트웨이의 보관 정책을 따릅니다.
 
-## 8. 테스트 및 제출 확인
+## 8. 실행 및 제출 확인
 
-```bash
-python -m unittest discover -s tests -v
-```
-
-테스트는 실제 임시 Git 저장소와 모의 HTTP 응답을 이용합니다. API Key나 비용 없이 변경 없음, staged/unstaged, 신규·삭제·이름 변경, 파일·줄 제한, 민감정보 제외·마스킹, 옵션, REST 요청 구성, 출력 형식 및 API 오류를 검증합니다. **모의 API 테스트는 실제 AI 응답의 의미적 품질을 보장하지 않습니다.**
-
-2026-10-13 기준 자동 테스트 26개가 통과했습니다. 직접 만든 공개용 `greeting.py` 샘플의 Git diff를 코디세이 게이트웨이(`gpt-5.4-mini`, `compatible`)로 보내, 호출 1회로 변경 요약·커밋·PR 제목 및 세 섹션 생성이 완료되는 것도 확인했습니다. 이 검증에는 현재 프로젝트의 소스 diff를 사용하지 않았습니다.
+직접 만든 공개용 `greeting.py` 샘플의 Git diff를 코디세이 게이트웨이(`gpt-5.4-mini`, `compatible`)로 보내, 호출 1회로 변경 요약·커밋·PR 제목 및 세 섹션 생성이 완료되는 것을 확인했습니다. 이 검증에는 현재 프로젝트의 소스 diff를 사용하지 않았습니다.
 
 실제 연동 확인은 키 설정 후 분석할 프로젝트에 변경을 만들고 수행합니다.
 
@@ -213,7 +207,7 @@ GitHub 업로드는 개발자가 별도로 수행합니다. 다음 명령은 CLI
 
 ```bash
 git switch -c feature/my-change
-git add main.py gitdraft scripts tests README.md pyproject.toml .gitignore
+git add main.py gitdraft scripts README.md pyproject.toml .gitignore
 git commit -m "feat: add AI Git commit and PR draft CLI"
 git push -u origin feature/my-change
 ```
@@ -227,7 +221,6 @@ gitdraft/
   git_context.py         Git 수집·민감정보 처리
   ai.py                  프롬프트·REST 요청·응답·오류 처리
 scripts/run_with_env.py   기존 .env의 AI 설정을 환경변수로 전달
-tests/test_gitdraft.py    자동 테스트
 pyproject.toml           Python 3.10+ 및 의존성 정보
 .gitignore               환경·키·캐시 제외
 README.md                사용 및 운영 가이드
