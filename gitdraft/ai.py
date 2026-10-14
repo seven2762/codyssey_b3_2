@@ -24,13 +24,21 @@ what에는 실제 관찰한 핵심 변경을 기록하라. 초안은 사용자�
 
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
+    """API 요청이 다른 주소로 자동 이동하는 것을 막는 HTTP 처리기."""
+
     def redirect_request(self, req, fp, code, msg, headers, newurl):
+        """리다이렉트 요청을 만들지 않도록 None을 반환한다."""
         return None
 
 
 def generate(context: dict, command: str, reason: str, key: str,
              model: str, temperature: float, max_tokens: int,
              base_url: str = "https://api.openai.com/v1", api_format: str = "openai") -> dict:
+    """Git 변경과 사용자 배경을 AI API에 한 번 보내고 생성된 JSON 초안을 반환한다.
+
+    전달받은 키·주소·모델·옵션으로 요청을 구성하고, 응답을 딕셔너리로 해석한다.
+    HTTP·네트워크·응답 형식 오류는 DraftError로 전달하며 자동 재시도하지 않는다.
+    """
     endpoint = urlsplit(base_url)
     if (endpoint.scheme != "https" or not endpoint.hostname or endpoint.username
             or endpoint.password or endpoint.query or endpoint.fragment):

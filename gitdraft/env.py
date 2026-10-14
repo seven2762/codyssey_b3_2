@@ -6,6 +6,11 @@ import shlex
 
 
 def load_ai_env(path: Path) -> None:
+    """.env에서 AI 설정만 읽어 현재 Python 프로세스의 os.environ에 저장한다.
+
+    키와 API 주소를 확인하고 파일의 설정을 우선 적용한다.
+    이후 cli.py가 os.getenv()로 같은 환경변수를 읽을 수 있다.
+    """
     allowed = {"AI_API_KEY", "OPENAI_API_KEY", "AI_BASE_URL", "AI_MODEL", "AI_API_FORMAT"}
     settings = {}
     for raw in path.read_text(encoding="utf-8").splitlines():

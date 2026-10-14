@@ -10,6 +10,7 @@ class DraftError(Exception):
 
 
 def mask(text: str) -> str:
+    """문자열에서 실제 API 키와 알려진 키·이메일·비밀번호 패턴을 가려 반환한다."""
     for name in ("AI_API_KEY", "OPENAI_API_KEY"):
         key = os.getenv(name, "")
         if key:
@@ -25,6 +26,7 @@ def mask(text: str) -> str:
 
 
 def sensitive(path: str) -> bool:
+    """파일 이름과 경로가 .env, 개인키 등 민감 파일에 해당하면 True를 반환한다."""
     p = Path(path)
     return (p.name == ".env" or p.name.startswith(".env.")
             or p.suffix.lower() in {".pem", ".key", ".p12", ".pfx"}
@@ -33,6 +35,10 @@ def sensitive(path: str) -> bool:
 
 
 def git(*args: str) -> str:
+    """현재 작업 폴더에서 Git 명령을 실행하고 터미널 출력(stdout)을 반환한다.
+
+    collect()가 status와 diff를 실행할 때 사용하며, 명령 실패는 DraftError로 알린다.
+    """
     try:
         result = subprocess.run(["git", "-c", "core.quotePath=false", *args],
                                 capture_output=True, encoding="utf-8", errors="replace",
@@ -47,6 +53,10 @@ def git(*args: str) -> str:
 
 
 def parse_status(raw: str) -> tuple[str, list[dict]]:
+    """git status의 -z 출력을 브랜치 이름과 변경 파일 목록으로 나누어 반환한다.
+
+    널 문자로 항목을 구분하고, 파일별 상태·경로 및 이름 변경 시 이전 경로를 읽는다.
+    """
     entries = raw.split("\0")
     branch = entries.pop(0).removeprefix("## ").split("...")[0]
     files = []
@@ -66,6 +76,11 @@ def parse_status(raw: str) -> tuple[str, list[dict]]:
 
 
 def collect(safe: bool, max_files: int, max_lines: int) -> dict:
+    """현재 Git 프로젝트의 변경 파일과 staged/unstaged diff를 AI 입력으로 정리한다.
+
+    변경이 없으면 빈 딕셔너리를 반환한다. 안전 모드에서는 민감 파일을 제외하고
+    내용을 마스킹하며, 선택한 파일 수와 diff 길이에 제한을 적용한다.
+    """
     if not (Path.cwd() / ".git").exists():
         raise DraftError("Git이 초기화된 프로젝트 루트 디렉토리에서 실행하세요.")
     branch, files = parse_status(git("status", "--porcelain=v1", "--branch", "-z",

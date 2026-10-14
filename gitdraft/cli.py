@@ -12,6 +12,7 @@ from .git_context import DraftError, collect, mask
 
 
 def positive(value: str) -> int:
+    """CLI 옵션의 문자열을 정수로 바꾸고, 0 이하이면 입력 오류를 발생시킨다."""
     number = int(value)
     if number <= 0:
         raise argparse.ArgumentTypeError("양의 정수를 입력하세요.")
@@ -19,6 +20,7 @@ def positive(value: str) -> int:
 
 
 def temperature(value: str) -> float:
+    """CLI 입력을 실수로 바꾸고, 유한한 0~2 범위의 temperature인지 확인한다."""
     number = float(value)
     if not math.isfinite(number) or not 0 <= number <= 2:
         raise argparse.ArgumentTypeError("temperature는 0~2 사이여야 합니다.")
@@ -26,6 +28,7 @@ def temperature(value: str) -> float:
 
 
 def parser() -> argparse.ArgumentParser:
+    """CLI에서 허용할 명령·옵션·기본값·입력 검증 규칙을 정의한 파서를 반환한다."""
     p = argparse.ArgumentParser(description="Git 변경 사항으로 검토용 커밋/PR 초안을 생성합니다.")
     p.add_argument("command", choices=("commit", "pr", "all"))
     p.add_argument("--model", "-model", default=os.getenv("AI_MODEL") or "gpt-4o-mini")
@@ -50,6 +53,10 @@ def parser() -> argparse.ArgumentParser:
 
 
 def line(value) -> str:
+    """문자열에서 제어문자와 불필요한 공백·끝 장식을 정리해 한 줄로 반환한다.
+
+    문자열이 아닌 값은 빈 문자열로 처리한다.
+    """
     if not isinstance(value, str):
         return ""
     value = re.sub(r"[\x00-\x1f\x7f-\x9f]", " ", value)
@@ -57,11 +64,16 @@ def line(value) -> str:
 
 
 def bullets(value, fallback: str) -> list[str]:
+    """AI의 배열 값을 불릿용 문장 최대 6개로 정리하고, 비어 있으면 안내문을 넣는다."""
     items = [line(x).lstrip("-* ") for x in value] if isinstance(value, list) else []
     return [x for x in items if x][:6] or [fallback]
 
 
 def normalize(result: dict, context: dict) -> tuple[dict, list[str]]:
+    """AI 초안의 필수 제목·요약, 제목 길이와 섹션 내용을 검증하고 다듬는다.
+
+    출력할 데이터와 경고 목록을 반환하며, 일부 diff만 분석했으면 요약에 표시한다.
+    """
     title, summary = line(result.get("title")), line(result.get("summary"))
     if not title or not summary:
         raise DraftError("AI 응답에 필수 제목 또는 변경 요약이 없습니다.")
@@ -89,6 +101,7 @@ def normalize(result: dict, context: dict) -> tuple[dict, list[str]]:
 
 
 def show(data: dict, command: str) -> None:
+    """정리된 초안을 터미널에 출력한다. commit/pr/all에 따라 표시할 구역을 선택한다."""
     print("\n--- Change Summary ---\n" + data["summary"])
     if command in {"commit", "all"}:
         print("\n--- Commit Message ---\n" + data["commit_title"] + "\n")
@@ -102,6 +115,11 @@ def show(data: dict, command: str) -> None:
 
 
 def main() -> int:
+    """.env 로드부터 Git 수집·AI 호출·검증·출력까지 CLI 전체 흐름을 실행한다.
+
+    parse_args()는 터미널 입력인 sys.argv를 읽는다. 변경 없음과 미리보기에서는
+    API를 호출하지 않으며, 실행 결과를 프로세스 종료 코드로 반환한다.
+    """
     try:
         env_path = Path.cwd() / ".env"
         if env_path.exists():
@@ -163,6 +181,10 @@ def main() -> int:
 
 
 def redact_result(value, key):
+    """응답의 문자열 값을 재귀적으로 찾아 민감정보와 API 키를 가린다.
+
+    딕셔너리와 리스트의 구조는 유지하고 문자열이 아닌 값은 그대로 반환한다.
+    """
     # JSON 직렬화 텍스트를 마스킹하면 구문이 손상될 수 있어 문자열 값마다 처리한다.
     if isinstance(value, str):
         return mask(value).replace(key, "[REDACTED]")
